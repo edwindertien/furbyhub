@@ -219,6 +219,7 @@ void FurbyBusClass::coreSetup() {
 }
 
 void FurbyBusClass::coreTick() {
+  _ticks++;
   // 1. take whatever core 0 has queued
   Cmd cmd;
   while (queue_try_remove(&g_q, &cmd)) {

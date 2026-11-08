@@ -2,6 +2,7 @@
 #include "FurbyBus.h"
 #include "FurbyCodes.h"
 #include "Settings.h"
+#include "Diag.h"
 
 StandaloneClass Standalone;
 
@@ -137,7 +138,7 @@ void StandaloneClass::readInputs() {
 }
 
 void StandaloneClass::loop() {
-  readInputs();
+  if (!(Dg.flags & DIAG_NO_INPUTS)) readInputs();
   switch (_state) {
     case Waking:   stepWaking();   break;
     case Sleeping: stepSleeping(); break;

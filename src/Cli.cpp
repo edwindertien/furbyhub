@@ -6,6 +6,8 @@
 #include "Settings.h"
 #include "Standalone.h"
 #include "Dashboard.h"
+#include <hardware/watchdog.h>
+#include "Diag.h"
 
 CliClass Cli;
 
@@ -170,6 +172,13 @@ void CliClass::stopScript() {
 void CliClass::printStatus(Print& out) {
   const Settings& v = Cfg.v;
   out.printf("%s %s  unit %u  SSID %s%u\r\n", FW_NAME, FW_VERSION, v.unitId, WIFI_SSID_PREFIX, v.unitId);
+  {
+    char rs[64];
+    if (Dg.resetWatchdog && Dg.resetStage == CR_CLEAN_REBOOT) strcpy(rs, "commanded reboot");
+    else if (Dg.resetWatchdog) snprintf(rs, sizeof rs, "WATCHDOG, last stage: %s", crumbName(Dg.resetStage));
+    else strcpy(rs, "power-on / other");
+    out.printf("uptime: %lus   last reset: %s   wifi AP: %s\r\n", (unsigned long)(millis() / 1000), rs, Dashboard.apUp() ? "up" : "DOWN");
+  }
   out.printf("auto: %s   standalone: %s", v.autoEnabled ? "on" : "off", Standalone.stateName());
   if (Standalone.remainingMs()) out.printf(" (sleeps in %lu s)", (unsigned long)(Standalone.remainingMs() / 1000));
   out.printf("   sensor: %s   button: %s   wifi clients: %u\r\n",
@@ -186,8 +195,8 @@ void CliClass::printStatus(Print& out) {
     const char* st = s.assumed == ASSUME_AWAKE ? "awake  " : s.assumed == ASSUME_ASLEEP ? "asleep " : "unknown";
     char last[24];
     if (!s.lastMs) strcpy(last, "-");
-    else if (s.lastCode == 0xFF) snprintf(last, sizeof last, "wake %lus ago", (unsigned long)((millis() - s.lastMs) / 1000));
-    else snprintf(last, sizeof last, "%c(%u) %lus ago", FurbyProtocol::letterFor(s.lastCode), s.lastCode, (unsigned long)((millis() - s.lastMs) / 1000));
+    else if (s.lastCode == 0xFF) snprintf(last, sizeof last, "wake %lus ago", (unsigned long)(max<int32_t>(0, (int32_t)(millis() - s.lastMs)) / 1000));
+    else snprintf(last, sizeof last, "%c(%u) %lus ago", FurbyProtocol::letterFor(s.lastCode), s.lastCode, (unsigned long)(max<int32_t>(0, (int32_t)(millis() - s.lastMs)) / 1000));
     out.printf(" %2d  GP%-2u   %c   %s   %-18s  %u\r\n", i + 1, FURBY_PIN[i],
                (v.enabledMask & (1u << i)) ? 'y' : '-', st, last, s.pending);
   }
@@ -222,6 +231,13 @@ void CliClass::printHelp(Print& out) {
     "set wakestagger|sleepstagger <ms>      set chatter on|off\r\n"
     "unit <1..99>                SSID number (applies after reboot)\r\n"
     "save | defaults | reboot\r\n"
+    "\r\n"
+    "WiFi diagnostics:\r\n"
+    "net                         AP state, http counters, heap, core 1 alive?, last reset cause\r\n"
+    "debug on|off                live log of every connection/request on this console\r\n"
+    "diag                        show subsystem switches\r\n"
+    "diag off|on <core1 wdt led stationpoll inputs dns ...>   (applies after reboot)\r\n"
+    "diag channel <0|1..13>      force WiFi channel (0 = default)   |   diag reset\r\n"
     "('timing' and 'set' change RAM only - use 'save' to keep them.)");
 }
 
@@ -261,6 +277,50 @@ void CliClass::execute(const String& lineIn, Print& out) {
   }
 
   if (cmd == "log") { out.print(_log.length() ? _log.c_str() : "(log empty)\r\n"); return; }
+
+  if (cmd == "net") {
+    Dashboard.printNet(out);
+    const uint32_t a = FurbyBus.ticks();
+    delay(50);
+    const uint32_t b = FurbyBus.ticks();
+    out.printf("core 1: %s (%lu engine ticks in 50 ms, expect ~47)\r\n",
+               !Dg.core1Enabled ? "PARKED by diag" : (b != a ? "running" : "NOT RUNNING"), (unsigned long)(b - a));
+    out.printf("heap: %d bytes free of %d   uptime: %lu s\r\n", rp2040.getFreeHeap(), rp2040.getTotalHeap(), (unsigned long)(millis() / 1000));
+    if (Dg.resetWatchdog && Dg.resetStage == CR_CLEAN_REBOOT) out.println("last reset: commanded reboot");
+    else if (Dg.resetWatchdog) out.printf("last reset: WATCHDOG - code was in stage '%s'\r\n", crumbName(Dg.resetStage));
+    else out.println("last reset: power-on / other (a brown-out would look like this)");
+    diagPrintFlags(out);
+    return;
+  }
+  if (cmd == "debug") {
+    bool b;
+    if (n < 2 || !onOff(t[1], b)) { out.printf("log is %s. usage: debug on|off\r\n", (Dg.flags & DIAG_QUIET) ? "off" : "on"); return; }
+    if (b) Dg.flags &= ~DIAG_QUIET; else Dg.flags |= DIAG_QUIET;
+    diagSave();
+    out.printf("live log %s\r\n", b ? "on" : "off");
+    return;
+  }
+  if (cmd == "diag") {
+    if (n >= 2) {
+      String sub = t[1]; sub.toLowerCase();
+      if (sub == "reset") { Dg.flags &= DIAG_QUIET; Dg.channel = 0; }
+      else if (sub == "channel") {
+        if (n < 3 || !isNum(t[2]) || t[2].toInt() > 13) { out.println("usage: diag channel <0|1..13>"); return; }
+        Dg.channel = t[2].toInt();
+      } else if (sub == "off" || sub == "on") {
+        for (int i = 2; i < n; i++) {
+          String nm = t[i]; nm.toLowerCase();
+          uint8_t bit;
+          if (!diagFlagByName(nm, bit)) { out.printf("unknown subsystem '%s'\r\n", nm.c_str()); return; }
+          if (sub == "off") Dg.flags |= bit; else Dg.flags &= ~bit;
+        }
+      } else { out.println("usage: diag | diag off|on <names> | diag channel <n> | diag reset"); return; }
+      diagSave();
+      out.println("saved - applies after 'reboot'");
+    }
+    diagPrintFlags(out);
+    return;
+  }
 
   // ── talking to furbies ──
   if (cmd == "wake") {
@@ -419,7 +479,7 @@ void CliClass::execute(const String& lineIn, Print& out) {
   }
   if (cmd == "save")     { out.println(Cfg.save() ? "saved" : "save FAILED"); return; }
   if (cmd == "defaults") { const uint8_t u = v.unitId; Cfg.defaults(); v.unitId = u; applyTiming(); Cfg.save(); out.println("defaults restored (unit number kept)"); return; }
-  if (cmd == "reboot")   { out.println("rebooting..."); delay(100); rp2040.reboot(); return; }
+  if (cmd == "reboot")   { out.println("rebooting..."); crumb(CR_CLEAN_REBOOT); delay(100); rp2040.reboot(); return; }
 
   out.printf("unknown command '%s' - try 'help'\r\n", cmd.c_str());
 }

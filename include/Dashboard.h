@@ -19,14 +19,19 @@ class DashboardClass {
 public:
   void begin();
   void loop();
-  uint8_t stations() const;     // WiFi clients currently associated
+  uint8_t stations() const { return _stations; }   // cached, refreshed every few seconds
   bool    apUp() const { return _apUp; }
+  void    printNet(Print& out) const;   // AP / HTTP counters for the `net` CLI command
 
 private:
   bool startAP();
   void restartAP();
 
+  void refreshStations();
+
   bool     _apUp = false;
+  volatile uint8_t _stations = 0;
+  uint32_t _nextStationPoll = 0;
   uint32_t _lastRequestMs = 0;
   uint32_t _lastClientMs = 0;
   uint32_t _nextApRetryMs = 0;

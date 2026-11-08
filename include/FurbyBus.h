@@ -67,6 +67,7 @@ public:
 
   const ChannelStatus& status(uint8_t ch) const { return _st[ch]; }
   uint32_t dropped() const { return _dropped; }   // actions lost to a full queue
+  uint32_t ticks() const { return _ticks; }       // engine ticks since boot (shows whether core 1 is running)
 
   // ── core 1 ──
   void coreSetup();
@@ -75,6 +76,7 @@ public:
 private:
   volatile bool _ready = false;
   volatile uint32_t _dropped = 0;
+  volatile uint32_t _ticks = 0;
   ChannelStatus _st[NUM_FURBIES];
 };
 

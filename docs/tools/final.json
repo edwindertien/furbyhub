@@ -1,0 +1,740 @@
+{
+ "series": [
+  [
+   "Series 1",
+   [
+    "wolf",
+    "leopard",
+    "witchs_cat",
+    "skunk",
+    "church_mouse",
+    "snowball"
+   ]
+  ],
+  [
+   "Series 2",
+   [
+    "tiger",
+    "giraffe",
+    "owl",
+    "dalmatian",
+    "bear",
+    "zebra"
+   ]
+  ],
+  [
+   "Series 3",
+   [
+    "snow_leopard",
+    "lamb",
+    "gorilla",
+    "frog",
+    "elephant",
+    "pink_flamingo"
+   ]
+  ],
+  [
+   "Series 4",
+   [
+    "lady_bug",
+    "dragon",
+    "tie_dye",
+    "coffee",
+    "bumble_bee",
+    "cheetah"
+   ]
+  ],
+  [
+   "Series 5",
+   [
+    "rooster",
+    "turtle",
+    "kiwi",
+    "sherbert",
+    "koala",
+    "lizard"
+   ]
+  ],
+  [
+   "Series 6",
+   [
+    "alligator",
+    "blue_turtle",
+    "color_change",
+    "champagne",
+    "tart_tangerine",
+    "husky"
+   ]
+  ],
+  [
+   "Series 7",
+   [
+    "red_wolf",
+    "gold_stripes",
+    "banana_peel",
+    "racoon",
+    "juicy_grape",
+    "mink"
+   ]
+  ],
+  [
+   "Series 8",
+   [
+    "puppy_dog",
+    "green_bean",
+    "rusty_dots",
+    "blue_blueberry",
+    "labrador",
+    "penguin"
+   ]
+  ],
+  [
+   "Series 9",
+   [
+    "parrot",
+    "gold_fish",
+    "ocean",
+    "eagle",
+    "raspberry_sundae",
+    "tabby_cat"
+   ]
+  ],
+  [
+   "Series 10",
+   [
+    "blue_jay",
+    "ocean_ripples",
+    "snowy_owl",
+    "coyote",
+    "red_snapper",
+    "lion"
+   ]
+  ],
+  [
+   "Specials",
+   [
+    "santa"
+   ]
+  ]
+ ],
+ "name": {
+  "witchs_cat": "Witch's Cat",
+  "racoon": "Racoon",
+  "sherbert": "Sherbert",
+  "blue_blueberry": "Blue Blueberry",
+  "santa": "Santa (Christmas)",
+  "tie_dye": "Tie Dye"
+ },
+ "presets": {
+  "wolf": [
+   "#cac0b1",
+   "#9aa49a",
+   "#e3adb7",
+   "#8d7e66",
+   "none",
+   "#5a3f25",
+   "#b4b9af",
+   ""
+  ],
+  "leopard": [
+   "#8b877d",
+   "#d2b7ae",
+   "#dba9b4",
+   "#96978f",
+   "spots",
+   "#3b382e",
+   "#c7c5c6",
+   ""
+  ],
+  "witchs_cat": [
+   "#181614",
+   "#100d0d",
+   "#f1c7aa",
+   "#0d0a09",
+   "none",
+   "#060605",
+   "#989293",
+   ""
+  ],
+  "skunk": [
+   "#17171b",
+   "#f2f2f4",
+   "#e2adb8",
+   "#2a2a2e",
+   "none",
+   "#070506",
+   "#f2f2f4",
+   ""
+  ],
+  "church_mouse": [
+   "#857b7b",
+   "#dddad7",
+   "#b79bc6",
+   "#99827f",
+   "none",
+   "#504c46",
+   "#e0e3ed",
+   ""
+  ],
+  "snowball": [
+   "#ecf2ee",
+   "#c6c9c3",
+   "#d59fa2",
+   "#cad1ce",
+   "none",
+   "#2c3127",
+   "#e9e9e8",
+   ""
+  ],
+  "tiger": [
+   "#b9742c",
+   "#f1efe9",
+   "#b4a7c6",
+   "#55442a",
+   "stripes",
+   "#251a10",
+   "#1a1a1a",
+   ""
+  ],
+  "giraffe": [
+   "#7e6440",
+   "#9e9262",
+   "#aea8b8",
+   "#5e3a1e",
+   "spots",
+   "#472809",
+   "#59554c",
+   ""
+  ],
+  "owl": [
+   "#7c7975",
+   "#7b7772",
+   "#e8b9c7",
+   "#8c8478",
+   "none",
+   "#2a2118",
+   "#b7b7b2",
+   ""
+  ],
+  "dalmatian": [
+   "#f2f2f0",
+   "#e0dfd3",
+   "#9b9ca5",
+   "#dedccf",
+   "spots",
+   "#1b1b1f",
+   "#eaeae4",
+   ""
+  ],
+  "bear": [
+   "#82726a",
+   "#ece6dc",
+   "#aaa2a0",
+   "#8d7869",
+   "none",
+   "#5c4e42",
+   "#4b3b33",
+   ""
+  ],
+  "zebra": [
+   "#ebe7da",
+   "#f3f0e6",
+   "#d6d0c0",
+   "#78807a",
+   "stripes",
+   "#25252b",
+   "#efece2",
+   ""
+  ],
+  "snow_leopard": [
+   "#e8e4dc",
+   "#f2f0ea",
+   "#d9c6c2",
+   "#a7a49e",
+   "spots",
+   "#5f4a3d",
+   "#f1efea",
+   ""
+  ],
+  "lamb": [
+   "#f4f2ee",
+   "#c9ac93",
+   "#f0c8b0",
+   "#c2b4a6",
+   "none",
+   "#431a0f",
+   "#d7d4d1",
+   ""
+  ],
+  "gorilla": [
+   "#3e3334",
+   "#a76148",
+   "#6b4637",
+   "#281f1f",
+   "none",
+   "#1b120f",
+   "#837e7e",
+   ""
+  ],
+  "frog": [
+   "#879a65",
+   "#e8e3b8",
+   "#c1be8d",
+   "#727b47",
+   "none",
+   "#494e1d",
+   "#4fb83c",
+   ""
+  ],
+  "elephant": [
+   "#7e8893",
+   "#cccbbe",
+   "#bda7c4",
+   "#576474",
+   "none",
+   "#343b40",
+   "#ada2a2",
+   ""
+  ],
+  "pink_flamingo": [
+   "#ebc4cc",
+   "#f64170",
+   "#ec4a8a",
+   "#f3a0b1",
+   "none",
+   "#4e2835",
+   "#ee4f8c",
+   ""
+  ],
+  "lady_bug": [
+   "#bb2b2d",
+   "#dc2428",
+   "#cfc8e0",
+   "#afabb5",
+   "spots",
+   "#160103",
+   "#17171a",
+   ""
+  ],
+  "dragon": [
+   "#485453",
+   "#f0e77c",
+   "#cfc472",
+   "#193338",
+   "none",
+   "#0e2228",
+   "#f2f0ec",
+   ""
+  ],
+  "tie_dye": [
+   "#e9ddd0",
+   "#f3edd6",
+   "#d7ccbd",
+   "#b98876",
+   "patches",
+   "#b59ad8",
+   "#f2efe9",
+   ""
+  ],
+  "coffee": [
+   "#b4a185",
+   "#b59f80",
+   "#c8b49c",
+   "#804b2f",
+   "none",
+   "#3d2412",
+   "#f3f1ee",
+   ""
+  ],
+  "bumble_bee": [
+   "#eed31e",
+   "#171717",
+   "#e9d12a",
+   "#222222",
+   "stripes",
+   "#161616",
+   "#161616",
+   ""
+  ],
+  "cheetah": [
+   "#e8d48c",
+   "#f6f3ea",
+   "#e0c677",
+   "#c0b36c",
+   "spots",
+   "#4a3b26",
+   "#efe8d4",
+   ""
+  ],
+  "rooster": [
+   "#c9391e",
+   "#f39a1c",
+   "#d9904a",
+   "#a02c19",
+   "none",
+   "#701408",
+   "#f0541a",
+   ""
+  ],
+  "turtle": [
+   "#2f4f33",
+   "#e6d6b4",
+   "#b9bda5",
+   "#645e50",
+   "patches",
+   "#16261a",
+   "#2f8a3c",
+   ""
+  ],
+  "kiwi": [
+   "#d8dc3a",
+   "#e8e05a",
+   "#c9c9a0",
+   "#aea24a",
+   "none",
+   "#6c5218",
+   "#1b2a6b",
+   ""
+  ],
+  "sherbert": [
+   "#e6286f",
+   "#58b6ee",
+   "#7ea6e6",
+   "#8a6c86",
+   "none",
+   "#741a5d",
+   "#f4e04a",
+   ""
+  ],
+  "koala": [
+   "#a9b1c4",
+   "#16161a",
+   "#c8d0e0",
+   "#8e95a8",
+   "none",
+   "#0d0818",
+   "#f2f2f4",
+   ""
+  ],
+  "lizard": [
+   "#e8a63a",
+   "#d9902c",
+   "#f0bd5a",
+   "#d49a3a",
+   "none",
+   "#8c5b16",
+   "#2a2118",
+   ""
+  ],
+  "alligator": [
+   "#a7cfa0",
+   "#dfeaea",
+   "#b7cde0",
+   "#acc08f",
+   "patches",
+   "#5a8f5a",
+   "#2f9a45",
+   ""
+  ],
+  "blue_turtle": [
+   "#1d2b4a",
+   "#0f0f14",
+   "#3b6fb5",
+   "#1b3658",
+   "none",
+   "#050705",
+   "#1d3f7a",
+   ""
+  ],
+  "color_change": [
+   "#7a4a24",
+   "#f08a1a",
+   "#b57b4a",
+   "#6f4c2b",
+   "patches",
+   "#371500",
+   "#1a1410",
+   ""
+  ],
+  "champagne": [
+   "#dfe3ea",
+   "#f4f4f6",
+   "#c9cfd8",
+   "#cfd6df",
+   "none",
+   "#9ca3b0",
+   "#f3f3f5",
+   ""
+  ],
+  "tart_tangerine": [
+   "#1a1411",
+   "#f2541a",
+   "#e9531c",
+   "#741f14",
+   "none",
+   "#160000",
+   "#f06a1a",
+   ""
+  ],
+  "husky": [
+   "#1d1d22",
+   "#16161a",
+   "#9aa0ae",
+   "#4c516a",
+   "none",
+   "#030200",
+   "#1b1b1f",
+   ""
+  ],
+  "red_wolf": [
+   "#8c1c1c",
+   "#1a0f0d",
+   "#b84a3a",
+   "#a63834",
+   "none",
+   "#440704",
+   "#8c1c1c",
+   ""
+  ],
+  "gold_stripes": [
+   "#b9792f",
+   "#f3ead8",
+   "#b7a3c0",
+   "#c38a6e",
+   "stripes",
+   "#2a1d12",
+   "#d9a24a",
+   ""
+  ],
+  "banana_peel": [
+   "#f3d92a",
+   "#f7e24a",
+   "#f0c93a",
+   "#c39830",
+   "none",
+   "#1c1a1a",
+   "#f8e24f",
+   ""
+  ],
+  "racoon": [
+   "#d9d7d5",
+   "#1a1a1c",
+   "#f0a58a",
+   "#ddd6ce",
+   "stripes",
+   "#2a2a2e",
+   "#e8e6e2",
+   ""
+  ],
+  "juicy_grape": [
+   "#4a1330",
+   "#d12a6e",
+   "#2a0f20",
+   "#3c0f0f",
+   "none",
+   "#140000",
+   "#d12a6e",
+   ""
+  ],
+  "mink": [
+   "#4a4540",
+   "#2a2724",
+   "#8a8a90",
+   "#6e6f76",
+   "none",
+   "#0d0a03",
+   "#17171a",
+   ""
+  ],
+  "puppy_dog": [
+   "#9c6b3a",
+   "#d7b58a",
+   "#a79ab0",
+   "#9c7a7d",
+   "none",
+   "#251404",
+   "#8a5a2e",
+   ""
+  ],
+  "green_bean": [
+   "#8fa6bf",
+   "#dfe6ee",
+   "#9bb0c9",
+   "#0f5078",
+   "none",
+   "#172c36",
+   "#2c6fb5",
+   ""
+  ],
+  "rusty_dots": [
+   "#c0391f",
+   "#f0cf2a",
+   "#c9a24a",
+   "#9f5016",
+   "spots",
+   "#15110e",
+   "#17120f",
+   ""
+  ],
+  "blue_blueberry": [
+   "#1f2f7a",
+   "#1b3f8f",
+   "#2b6fc4",
+   "#0b2564",
+   "none",
+   "#01040e",
+   "#1f84d6",
+   ""
+  ],
+  "labrador": [
+   "#b8874a",
+   "#d9ba86",
+   "#b08040",
+   "#aa9564",
+   "none",
+   "#3b2000",
+   "#b8874a",
+   ""
+  ],
+  "penguin": [
+   "#1e1e22",
+   "#ffffff",
+   "#f2cf4a",
+   "#f2cf4a",
+   "none",
+   "#000000",
+   "#1e1e22",
+   ""
+  ],
+  "parrot": [
+   "#f2c93a",
+   "#f4f0e0",
+   "#2b5fd1",
+   "#70202d",
+   "none",
+   "#0a0c20",
+   "#d6302a",
+   ""
+  ],
+  "gold_fish": [
+   "#f3a05a",
+   "#f8d9b0",
+   "#f6b878",
+   "#e48b68",
+   "none",
+   "#4a2820",
+   "#f6c88a",
+   ""
+  ],
+  "ocean": [
+   "#2a8a96",
+   "#e6efe8",
+   "#2a6f86",
+   "#645f44",
+   "none",
+   "#042227",
+   "#1f6f7a",
+   ""
+  ],
+  "eagle": [
+   "#aaa6a0",
+   "#e8e6e2",
+   "#f0d84a",
+   "#8c7f8a",
+   "none",
+   "#342226",
+   "#f4f2ee",
+   ""
+  ],
+  "raspberry_sundae": [
+   "#e8e2e6",
+   "#f6f0f2",
+   "#e9a3c0",
+   "#905a78",
+   "patches",
+   "#d25a8a",
+   "#f1eaf0",
+   ""
+  ],
+  "tabby_cat": [
+   "#d8d2c4",
+   "#f3efe6",
+   "#2b2724",
+   "#32251c",
+   "stripes",
+   "#2f2a26",
+   "#1d1a18",
+   ""
+  ],
+  "blue_jay": [
+   "#3a7fc4",
+   "#e9f0f6",
+   "#3a7fc4",
+   "#0c4a7c",
+   "none",
+   "#072e5e",
+   "#2a6fb5",
+   ""
+  ],
+  "ocean_ripples": [
+   "#1f6a6e",
+   "#3a8a90",
+   "#1d5a60",
+   "#226d72",
+   "patches",
+   "#0f3a40",
+   "#164a52",
+   ""
+  ],
+  "snowy_owl": [
+   "#e9e0d0",
+   "#f6f3ec",
+   "#d9cfc0",
+   "#b0b0a4",
+   "none",
+   "#342d1b",
+   "#f1ece2",
+   ""
+  ],
+  "coyote": [
+   "#7a5a40",
+   "#ece6dc",
+   "#7a5a40",
+   "#442c24",
+   "none",
+   "#270d05",
+   "#e8e4dc",
+   ""
+  ],
+  "red_snapper": [
+   "#a8322a",
+   "#f2ece6",
+   "#e9d0c0",
+   "#5e7465",
+   "none",
+   "#340d00",
+   "#f2eee8",
+   ""
+  ],
+  "lion": [
+   "#c9693f",
+   "#d98a55",
+   "#d7a07c",
+   "#c9824a",
+   "none",
+   "#764341",
+   "#8a3b20",
+   ""
+  ],
+  "santa": [
+   "#d9262c",
+   "#eeeae4",
+   "#d7d3d4",
+   "#e7c9a0",
+   "none",
+   "#000000",
+   "#d9262c",
+   "santa"
+  ]
+ }
+}

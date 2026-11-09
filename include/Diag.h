@@ -26,13 +26,14 @@ enum : uint8_t {
   CR_NONE = 0, CR_LOOP = 1, CR_CLI = 2, CR_STANDALONE = 3,
   CR_DNS = 10, CR_ACCEPT = 11, CR_READ_REQ = 12, CR_READ_HDR = 13, CR_SEND = 14, CR_CLOSE = 15,
   CR_STATIONS = 20, CR_AP_START = 21, CR_AP_RESTART = 22,
-  CR_FLASH_SAVE = 30, CR_CLEAN_REBOOT = 250,
+  CR_FLASH_SAVE = 30, CR_OSC = 40, CR_CLEAN_REBOOT = 250,
 };
 
 struct DiagState {
   uint8_t  flags = 0;             // persisted
   uint8_t  channel = 0;           // persisted, 0 = default per unit
   bool     core1Enabled = true;   // runtime copy read by core 1
+  bool     wdtOn = false;         // watchdog running (set by main once it starts)
   // reset information captured at boot
   bool     resetWatchdog = false;
   uint8_t  resetStage = CR_NONE;

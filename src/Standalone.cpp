@@ -3,6 +3,7 @@
 #include "FurbyCodes.h"
 #include "Settings.h"
 #include "Diag.h"
+#include "Sensor.h"
 
 StandaloneClass Standalone;
 
@@ -11,7 +12,6 @@ inline bool due(uint32_t t) { return (int32_t)(millis() - t) >= 0; }   // wrap-s
 }
 
 void StandaloneClass::begin() {
-  pinMode(PIN_SENSOR, SENSOR_ACTIVE_HIGH ? INPUT_PULLDOWN : INPUT_PULLUP);  // unplugged sensor = inactive
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   _state = Idle;
   _cooldownUntil = millis() + 2000;   // let sensors settle after power-up (PIRs often fire once on boot)
@@ -119,9 +119,8 @@ void StandaloneClass::stepAwake() {
 void StandaloneClass::readInputs() {
   const uint32_t now = millis();
 
-  const bool s = (digitalRead(PIN_SENSOR) == HIGH) == SENSOR_ACTIVE_HIGH;
-  if (s != _sensorRaw) { _sensorRaw = s; _sensorSince = now; }
-  if (s != _sensor && now - _sensorSince >= INPUT_DEBOUNCE_MS) {
+  const bool s = Sensor.present();                        // debounce / hysteresis live in Sensor
+  if (s != _sensor) {
     _sensor = s;
     if (_sensor && Cfg.v.autoEnabled) trigger();
   }

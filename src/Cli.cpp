@@ -8,6 +8,8 @@
 #include "Dashboard.h"
 #include <hardware/watchdog.h>
 #include "Diag.h"
+#include "Sensor.h"
+#include "Osc.h"
 
 CliClass Cli;
 
@@ -27,6 +29,17 @@ int tokenize(const String& line, String* tok, int maxTok) {
     i = j;
   }
   return n;
+}
+
+// the rest of the line after skipping `skip` space-separated tokens (keeps inner spaces)
+String restOf(const String& line, int skip) {
+  int i = 0, len = line.length();
+  for (int k = 0; k < skip; k++) {
+    while (i < len && line[i] == ' ') i++;
+    while (i < len && line[i] != ' ') i++;
+  }
+  while (i < len && line[i] == ' ') i++;
+  return line.substring(i);
 }
 
 bool isNum(const String& s) {
@@ -115,10 +128,7 @@ void CliClass::begin() {
   Serial.printf("%s %s - unit %u. Type 'help'.\r\n", FW_NAME, FW_VERSION, Cfg.v.unitId);
 }
 
-void CliClass::applyTiming() {
-  BusTiming t{Cfg.v.pulseUs, Cfg.v.halfBitUs, Cfg.v.gapMs, Cfg.v.wakeMs, Cfg.v.repeats};
-  FurbyBus.setTiming(t);
-}
+void CliClass::applyTiming() { Cfg.applyRuntime(); }
 
 void CliClass::poll() {
   while (Serial.available()) {
@@ -133,6 +143,14 @@ void CliClass::poll() {
       if (_rx.length()) _rx.remove(_rx.length() - 1);
     } else if (_rx.length() < 90) {
       _rx += ch;
+    }
+  }
+
+  if (_watchUntil) {
+    if ((int32_t)(millis() - _watchUntil) >= 0) { _watchUntil = 0; Serial.println("watch finished"); }
+    else if ((int32_t)(millis() - _watchNext) >= 0) {
+      _watchNext = millis() + 250;
+      Serial.printf("%s  dist=%ld mm  %s\r\n", Sensor.type(), (long)Sensor.distanceMm(), Sensor.present() ? "PRESENT" : "-");
     }
   }
 
@@ -179,6 +197,7 @@ void CliClass::printStatus(Print& out) {
     else strcpy(rs, "power-on / other");
     out.printf("uptime: %lus   last reset: %s   wifi AP: %s\r\n", (unsigned long)(millis() / 1000), rs, Dashboard.apUp() ? "up" : "DOWN");
   }
+  out.printf("config: %s\r\n", Cfg.loadNote.c_str());
   out.printf("auto: %s   standalone: %s", v.autoEnabled ? "on" : "off", Standalone.stateName());
   if (Standalone.remainingMs()) out.printf(" (sleeps in %lu s)", (unsigned long)(Standalone.remainingMs() / 1000));
   out.printf("   sensor: %s   button: %s   wifi clients: %u\r\n",
@@ -187,7 +206,7 @@ void CliClass::printStatus(Print& out) {
              v.pulseUs, v.halfBitUs, v.halfBitUs * 2, v.repeats, v.gapMs, v.wakeMs);
   out.printf("standalone: awake=%lus  wakestagger=%ums  sleepstagger=%ums  chatter=%s (%u-%us)  cooldown=%us\r\n",
              (unsigned long)(v.awakeMs / 1000), v.wakeStaggerMs, v.sleepStaggerMs, v.chatter ? "on" : "off",
-             v.chatMinMs / 1000, v.chatMaxMs / 1000, v.cooldownMs / 1000);
+             (unsigned)(v.chatMinMs / 1000), (unsigned)(v.chatMaxMs / 1000), (unsigned)(v.cooldownMs / 1000));
   out.print("enabled furbies: "); printSet(out, v.enabledMask); out.println();
   out.println("  #  gpio  en  assumed   last message        queue");
   for (int i = 0; i < NUM_FURBIES; i++) {
@@ -233,12 +252,22 @@ void CliClass::printHelp(Print& out) {
     "save | defaults | reboot\r\n"
     "\r\n"
     "WiFi diagnostics:\r\n"
-    "net                         AP state, http counters, heap, core 1 alive?, last reset cause\r\n"
+    "net                         network state, http counters, heap, core 1 alive?, last reset cause\r\n"
+    "osc status | osc send /address [args...] | peers      hub-to-hub OSC\r\n"
+    "sensor [watch [s]]         type, live distance, thresholds; watch streams readings\r\n"
     "debug on|off                live log of every connection/request on this console\r\n"
     "diag                        show subsystem switches\r\n"
     "diag off|on <core1 wdt led stationpoll inputs dns ...>   (applies after reboot)\r\n"
     "diag channel <0|1..13>      force WiFi channel (0 = default)   |   diag reset\r\n"
-    "('timing' and 'set' change RAM only - use 'save' to keep them.)");
+    "('timing' and 'set' change RAM only - use 'save' to keep them.)\r\n"
+    "\r\n"
+    "furbyhub.json (everything above is also reachable as a JSON path):\r\n"
+    "config show                 whole configuration (passwords hidden)\r\n"
+    "config get <path>           e.g. network.ssid, furbies.3.preset, sensor\r\n"
+    "config set <path> <value>   RAM only until 'save'; furbies.N.* use furby numbers, rules.N.* are 0-based\r\n"
+    "config reload               re-read the file from flash\r\n"
+    "rule list | rule add <on> <delay_ms> <command...> | rule del <n> | rule clear\r\n"
+    "                            e.g. rule add hub/3/presence=1 400 wakeall");
 }
 
 // ───────────────────────── command dispatch ─────────────────────────
@@ -271,15 +300,21 @@ void CliClass::execute(const String& lineIn, Print& out) {
   }
 
   if (cmd == "sensor") {
-    out.printf("sensor GP%u: %s   button GP%u: %s\r\n", PIN_SENSOR, Standalone.sensorActive() ? "ACTIVE" : "idle",
-               PIN_BUTTON, Standalone.buttonDown() ? "down" : "up");
+    if (n >= 2 && t[1] == "watch") {                       // stream readings to calibrate wake_mm / sleep_mm
+      _watchUntil = millis() + (n >= 3 && isNum(t[2]) ? t[2].toInt() * 1000UL : 30000UL);
+      _watchNext = 0;
+      out.println("watching the sensor (Serial only), 'stop' ends it");
+      return;
+    }
+    out.printf("sensor type: %s   %s   button GP%u: %s\r\n", Sensor.type(), Standalone.sensorActive() ? "PRESENT" : "nobody", PIN_BUTTON, Standalone.buttonDown() ? "down" : "up");
+    if (Sensor.isDistance()) out.printf("distance: %ld mm   wake below %u mm, gone above %u mm, hold %u ms\r\n", (long)Sensor.distanceMm(), v.wakeMm, v.sleepMm, v.smoothMs);
     return;
   }
-
   if (cmd == "log") { out.print(_log.length() ? _log.c_str() : "(log empty)\r\n"); return; }
 
   if (cmd == "net") {
     Dashboard.printNet(out);
+    Osc.printStatus(out);
     const uint32_t a = FurbyBus.ticks();
     delay(50);
     const uint32_t b = FurbyBus.ticks();
@@ -409,6 +444,7 @@ void CliClass::execute(const String& lineIn, Print& out) {
   }
   if (cmd == "stop") {
     stopScript();
+    _watchUntil = 0;
     FurbyBus.clearAll();
     applyTiming();                  // undo any temporary pulse width
     out.println("stopped: scripts aborted, queues cleared, all wires released");
@@ -416,6 +452,83 @@ void CliClass::execute(const String& lineIn, Print& out) {
   }
 
   // ── configuration ──
+  if (cmd == "osc" || cmd == "peers") {
+    String sub = (cmd == "peers") ? String("status") : (n >= 2 ? t[1] : String("status"));
+    sub.toLowerCase();
+    if (sub == "status") { Osc.printStatus(out); return; }
+    if (sub == "send") {                                   // osc send /furby/hub/2/wake 3,4   (test / debug)
+      if (n < 3 || t[2][0] != '/') { out.println("usage: osc send /address [args...]   (ints, floats, text)"); return; }
+      OscCodec::Arg a[OscCodec::MAX_ARGS];
+      uint8_t na = 0;
+      for (int i = 3; i < n && na < OscCodec::MAX_ARGS; i++) {
+        char* end = nullptr;
+        const long iv = strtol(t[i].c_str(), &end, 10);
+        if (t[i].length() && !*end) a[na++] = OscCodec::argI((int32_t)iv);
+        else { const float fv = strtof(t[i].c_str(), &end); a[na++] = (t[i].length() && !*end) ? OscCodec::argF(fv) : OscCodec::argS(t[i].c_str()); }
+      }
+      out.println(Osc.send(t[2].c_str(), a, na) ? "sent" : "not sent (osc inactive or message too long)");
+      return;
+    }
+    out.println("usage: osc status | osc send /address [args...] | peers");
+    return;
+  }
+  if (cmd == "config") {
+    String sub = n >= 2 ? t[1] : String("show");
+    sub.toLowerCase();
+    if (sub == "show") { out.println(Cfg.json(true, true)); return; }
+    if (sub == "get") {
+      String r;
+      if (n < 3) { out.println("usage: config get <path>"); return; }
+      if (Cfg.getPath(t[2], r)) out.println(r); else out.printf("unknown key '%s' (try: config show)\r\n", t[2].c_str());
+      return;
+    }
+    if (sub == "set") {
+      if (n < 4) { out.println("usage: config set <path> <value>"); return; }
+      const String value = restOf(line, 3);
+      String err; bool reboot = false;
+      if (Cfg.setPath(t[2], value, err, reboot)) {
+        applyTiming();
+        out.println("ok (RAM only - 'save' to keep it)");
+        if (reboot) out.println("this setting needs a reboot to take effect (after 'save')");
+      } else out.println(err);
+      return;
+    }
+    if (sub == "reload") { Cfg.load(); applyTiming(); out.println(Cfg.loadNote); return; }
+    out.println("usage: config show | get <path> | set <path> <value> | reload");
+    return;
+  }
+  if (cmd == "rule") {
+    String sub = n >= 2 ? t[1] : String("list");
+    sub.toLowerCase();
+    if (sub == "list") {
+      if (!v.ruleCount) out.println("no rules");
+      for (int i = 0; i < v.ruleCount; i++) out.printf("%d: on %s  after %ums  do: %s\r\n", i, v.rules[i].on, v.rules[i].delayMs, v.rules[i].act);
+      return;
+    }
+    if (sub == "clear") { v.ruleCount = 0; out.println("rules cleared (RAM only - 'save' to keep)"); return; }
+    if (sub == "del") {
+      if (n < 3 || !isNum(t[2]) || t[2].toInt() >= v.ruleCount) { out.println("usage: rule del <n>  (see 'rule list')"); return; }
+      for (int i = t[2].toInt(); i + 1 < v.ruleCount; i++) v.rules[i] = v.rules[i + 1];
+      v.ruleCount--;
+      out.println("deleted (RAM only - 'save' to keep)");
+      return;
+    }
+    if (sub == "add") {
+      const String act = restOf(line, 4);
+      if (n < 5 || !isNum(t[3]) || !act.length()) { out.println("usage: rule add <hub/N/what[=value]> <delay_ms> <command...>"); return; }
+      if (v.ruleCount >= MAX_RULES) { out.println("at most 8 rules"); return; }
+      Rule& r = v.rules[v.ruleCount];
+      memset(&r, 0, sizeof r);
+      strlcpy(r.on, t[2].c_str(), sizeof r.on);
+      strlcpy(r.act, act.c_str(), sizeof r.act);
+      r.delayMs = (uint16_t)constrain(t[3].toInt(), 0, 60000);
+      v.ruleCount++;
+      out.printf("rule %d added (RAM only - 'save' to keep)\r\n", v.ruleCount - 1);
+      return;
+    }
+    out.println("usage: rule list | add <on> <delay_ms> <command...> | del <n> | clear");
+    return;
+  }
   if (cmd == "enable" || cmd == "disable") {
     uint16_t m; if (!needSet(1, m)) return;
     // 'all' for enable means every furby, not just the currently enabled ones
@@ -477,7 +590,7 @@ void CliClass::execute(const String& lineIn, Print& out) {
     out.printf("unit %u saved - SSID becomes %s%u after 'reboot'\r\n", v.unitId, WIFI_SSID_PREFIX, v.unitId);
     return;
   }
-  if (cmd == "save")     { out.println(Cfg.save() ? "saved" : "save FAILED"); return; }
+  if (cmd == "save")     { out.println(Cfg.save() ? "saved to furbyhub.json" : (Cfg.fsOk() ? "save FAILED" : "save FAILED: LittleFS is not mounted")); return; }
   if (cmd == "defaults") { const uint8_t u = v.unitId; Cfg.defaults(); v.unitId = u; applyTiming(); Cfg.save(); out.println("defaults restored (unit number kept)"); return; }
   if (cmd == "reboot")   { out.println("rebooting..."); crumb(CR_CLEAN_REBOOT); delay(100); rp2040.reboot(); return; }
 

@@ -39,6 +39,7 @@ private:
   uint32_t _scriptDue = 0;
   bool     _scriptRunning = false;
   String   _log;
+  uint32_t _watchUntil = 0, _watchNext = 0;
 };
 
 extern CliClass Cli;

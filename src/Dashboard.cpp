@@ -4,12 +4,15 @@
 #include "FurbyBus.h"
 #include "Settings.h"
 #include "Standalone.h"
+#include "Sensor.h"
 #include "config.h"
 #include "Diag.h"
 
 #include <WiFi.h>
 #include <DNSServer.h>
 #include <pico/cyw43_arch.h>
+#include <LEAmDNS.h>
+#include "Osc.h"
 
 // ---------------------------------------------------------------------------
 // Transport: raw WiFiServer, one request per connection, closed immediately.
@@ -126,8 +129,13 @@ String statusJson() {
   j += ",\"state\":\"";   j += Standalone.stateName(); j += "\"";
   j += ",\"remaining\":"; j += (unsigned long)(Standalone.remainingMs() / 1000);
   j += ",\"sensor\":";    j += Standalone.sensorActive() ? "true" : "false";
+  j += ",\"stype\":\"";   j += Sensor.type(); j += "\"";
+  j += ",\"dist\":";      j += (long)Sensor.distanceMm();
   j += ",\"stations\":";  j += Dashboard.stations();
   j += ",\"script\":";    j += Cli.scriptRunning() ? "true" : "false";
+  j += ",\"net\":\"";     j += Dashboard.mode(); j += "\"";
+  j += ",\"want\":\"";    j += v.netMode; j += "\"";
+  j += ",\"link\":";      j += Dashboard.linkUp() ? "true" : "false";
   j += ",\"mask\":";      j += v.enabledMask;
   j += ",\"f\":[";
   const uint32_t now = millis();
@@ -138,6 +146,18 @@ String statusJson() {
     j += ',';  j += (s.lastCode == 0xFF ? -1 : (int)s.lastCode);
     j += ',';  j += s.busy ? 1 : 0;
     j += ',';  j += s.lastMs ? (long)max<int32_t>(0, (int32_t)(now - s.lastMs)) / 1000 : -1L;
+    j += ']';
+  }
+  j += "],\"peers\":[";
+  bool firstPeer = true;
+  for (uint8_t i = 0; i < MAX_PEERS; i++) {
+    const PeerInfo& p = Osc.peer(i);
+    if (!p.used) continue;
+    if (!firstPeer) j += ',';
+    firstPeer = false;
+    j += '['; j += p.id; j += ','; j += (p.presence > 0 ? 1 : 0);
+    j += ','; j += (long)p.dist;
+    j += ','; j += (long)(max<int32_t>(0, (int32_t)(now - p.lastMs)) / 1000);
     j += ']';
   }
   j += "]}";
@@ -162,9 +182,14 @@ void handleClient() {
   reqLine.trim();
 
   crumb(CR_READ_HDR);
-  while (client.connected()) {                         // drain the headers
+  size_t contentLength = 0;
+  while (client.connected()) {                         // drain the headers (keep Content-Length for POST)
     const String line = client.readStringUntil('\n');
     if (line == "\r" || line.length() == 0) break;
+    if (line.length() > 15 && (line[0] == 'C' || line[0] == 'c')) {
+      String l = line; l.toLowerCase();
+      if (l.startsWith("content-length:")) contentLength = (size_t)l.substring(15).toInt();
+    }
   }
 
   const int sp1 = reqLine.indexOf(' ');
@@ -187,7 +212,33 @@ void handleClient() {
   const char* result = "200";
   size_t want = 0, sent = 0;
 
-  if (method != "GET") {
+  String body;                                         // POST body (config upload only, small)
+  if (method == "POST" && contentLength > 0 && contentLength <= 8192) {
+    body.reserve(contentLength);
+    const uint32_t deadline = millis() + 2000;
+    while (body.length() < contentLength && (int32_t)(millis() - deadline) < 0) {
+      while (client.available() && body.length() < contentLength) body += (char)client.read();
+      rp2040.wdt_reset();
+      delay(1);
+    }
+  }
+
+  if (path == "/api/config" && (method == "GET" || method == "POST")) {
+    g_lastRequest = millis();
+    if (method == "GET") {
+      const String j = Cfg.json(true, true);           // passwords come out as ********
+      want = j.length(); sent = sendText(client, "200 OK", "application/json; charset=utf-8", j);
+    } else {
+      String err; bool reboot = false;
+      JsonDocument r;
+      if (body.length() == 0)                         { r["ok"] = false; r["error"] = "empty body"; }
+      else if (Cfg.applyJson(body, err, reboot))      { Cfg.applyRuntime(); r["ok"] = true; r["saved"] = Cfg.save(); r["reboot"] = reboot; }
+      else                                            { r["ok"] = false; r["error"] = err; }
+      String j; serializeJson(r, j);
+      result = r["ok"].as<bool>() ? "200" : "400";
+      want = j.length(); sent = sendText(client, r["ok"].as<bool>() ? "200 OK" : "400 Bad Request", "application/json; charset=utf-8", j);
+    }
+  } else if (method != "GET") {
     result = "405";
     const String body = "Only GET supported";
     want = body.length(); sent = sendText(client, "405 Method Not Allowed", "text/plain; charset=utf-8", body);
@@ -231,7 +282,11 @@ void handleClient() {
 
 }  // namespace
 
-// ───────────────────────── AP ─────────────────────────
+// ───────────────────────── network ─────────────────────────
+
+namespace { bool g_serverStarted = false; bool g_mdnsUp = false; }
+
+IPAddress DashboardClass::ip() const { return g_apIP; }
 
 bool DashboardClass::startAP() {
   const String ssid = String(WIFI_SSID_PREFIX) + Cfg.v.unitId;
@@ -243,7 +298,7 @@ bool DashboardClass::startAP() {
   dlog("AP: starting SSID '%s' channel %u", ssid.c_str(), ch);
   WiFi.mode(WIFI_AP);
   WiFi.softAPConfig(IPAddress(AP_IP_OCTETS), IPAddress(AP_IP_OCTETS), AP_MASK);
-  const bool ok = WiFi.softAP(ssid.c_str(), WIFI_PASS, ch, false);
+  const bool ok = WiFi.softAP(ssid.c_str(), Cfg.v.apPass, ch, false);
   delay(200);                                  // let the AP and DHCP server settle before serving
   dlog("AP: softAP() returned %s", ok ? "true" : "FALSE");
   if (!ok) return false;
@@ -252,9 +307,40 @@ bool DashboardClass::startAP() {
   if (!g_apIP.isSet()) g_apIP = IPAddress(AP_IP_OCTETS);
 
   server.begin();
+  g_serverStarted = true;
   if (!(Dg.flags & DIAG_NO_DNS)) g_dnsUp = dns.start(53, "*", g_apIP);
   dlog("AP: up, IP %s, http server on :80, DNS %s", g_apIP.toString().c_str(), g_dnsUp ? "on" : "OFF");
   return true;
+}
+
+// Router mode: join the dedicated furby network.
+//
+// arduino-pico has no truly asynchronous join: even beginNoBlock() waits inside the driver for up
+// to the WiFi timeout. So:
+//   * the first join happens in setup() with the full 15 s (nothing else is running yet)
+//   * retries while running use a 4 s timeout, back off (10, 20, 30, then every 60 s), and widen
+//     the watchdog around the call. With the router absent the main loop therefore stalls for at
+//     most ~4 s per minute; the furby pulse engine on core 1 is not affected, and sensing,
+//     standalone behaviour and furbies keep working without any WiFi.
+void DashboardClass::staBegin() {
+  const Settings& c = Cfg.v;
+  const bool running = Dg.wdtOn;
+  WiFi.setTimeout(running ? 4000 : 15000);
+  WiFi.mode(WIFI_STA);
+  WiFi.setHostname((String("furbyhub") + c.unitId).c_str());
+  IPAddress ip, gw, mask;
+  if (c.ip[0] && ip.fromString(c.ip)) {              // set before EVERY join: begin() tears the interface down first
+    if (!(c.gateway[0] && gw.fromString(c.gateway))) gw = IPAddress(ip[0], ip[1], ip[2], 1);
+    if (!(c.mask[0] && mask.fromString(c.mask))) mask = IPAddress(255, 255, 255, 0);
+    WiFi.config(ip, gw, gw, mask);                   // address, dns, gateway, subnet mask
+  }
+  dlog("STA: joining '%s' (%s), attempt %u", c.staSsid, c.ip[0] ? "static IP" : "DHCP", (unsigned)_staFails + 1);
+  const uint32_t t0 = millis();
+  if (running) rp2040.wdt_begin(20000);
+  WiFi.beginNoBlock(c.staSsid, c.staPass[0] ? c.staPass : nullptr);
+  if (running) rp2040.wdt_begin(WATCHDOG_MS);
+  dlog("STA: join attempt took %lu ms", (unsigned long)(millis() - t0));
+  if (_staFails < 255) _staFails++;
 }
 
 void DashboardClass::restartAP() {
@@ -268,18 +354,26 @@ void DashboardClass::restartAP() {
 }
 
 void DashboardClass::begin() {
-  _apUp = startAP();
+  _sta = !strcmp(Cfg.v.netMode, "sta") && Cfg.v.staSsid[0];
   _stations = 0;
   _nextStationPoll = millis() + 3000;
   _lastRequestMs = _lastClientMs = millis();
   _nextApRetryMs = millis() + 5000;
+  if (_sta) {
+    _apUp = false;
+    staBegin();
+    _nextLinkCheck = millis() + 500;
+    _staNextTry = millis() + 10000;
+  } else {
+    _apUp = startAP();
+  }
 }
 
 // softAPgetStationNum() makes raw CYW43 driver calls (plus a malloc) without taking the
 // WiFi lock. Calling it on every loop() pass raced the driver, which is when a client joins.
 // So: ask rarely, and under the same lock the WiFi stack itself uses.
 void DashboardClass::refreshStations() {
-  if (!_apUp || (Dg.flags & DIAG_NO_STATIONPOLL)) { _stations = 0; return; }
+  if (_sta || !_apUp || (Dg.flags & DIAG_NO_STATIONPOLL)) { _stations = 0; return; }
   crumb(CR_STATIONS);
   cyw43_arch_lwip_begin();
   const uint8_t n = WiFi.softAPgetStationNum();
@@ -289,8 +383,15 @@ void DashboardClass::refreshStations() {
 }
 
 void DashboardClass::printNet(Print& out) const {
-  out.printf("wifi AP: %s  SSID %s%u  IP %s  clients: %u%s\r\n", _apUp ? "up" : "DOWN", WIFI_SSID_PREFIX, Cfg.v.unitId,
-             g_apIP.toString().c_str(), _stations, (Dg.flags & DIAG_NO_STATIONPOLL) ? " (polling disabled)" : "");
+  if (_sta) {
+    int rssi = 0;
+    if (_apUp) { cyw43_arch_lwip_begin(); rssi = WiFi.RSSI(); cyw43_arch_lwip_end(); }
+    out.printf("wifi: router mode, '%s' - %s  IP %s  signal %d dBm  (dashboard: http://furbyhub%u.local or the IP)\r\n", Cfg.v.staSsid,
+               _apUp ? "CONNECTED" : "NOT CONNECTED (retrying with back-off, at most once a minute)", g_apIP.toString().c_str(), rssi, Cfg.v.unitId);
+  } else {
+    out.printf("wifi AP: %s  SSID %s%u  IP %s  clients: %u%s\r\n", _apUp ? "up" : "DOWN", WIFI_SSID_PREFIX, Cfg.v.unitId,
+               g_apIP.toString().c_str(), _stations, (Dg.flags & DIAG_NO_STATIONPOLL) ? " (polling disabled)" : "");
+  }
   out.printf("http: %lu requests, %lu empty connections, %lu incomplete sends\r\n",
              (unsigned long)Dg.httpRequests, (unsigned long)Dg.httpEmpty, (unsigned long)Dg.httpFailedSend);
   out.printf("last request: %s  (%lu s ago)\r\n", g_lastReq, g_lastReqAt ? (unsigned long)((millis() - g_lastReqAt) / 1000) : 0UL);
@@ -298,6 +399,38 @@ void DashboardClass::printNet(Print& out) const {
 
 void DashboardClass::loop() {
   const uint32_t now = millis();
+
+  if (_sta) {
+    if ((int32_t)(now - _nextLinkCheck) >= 0) {
+      _nextLinkCheck = now + 1000;
+      cyw43_arch_lwip_begin();
+      const bool up = (WiFi.status() == WL_CONNECTED);
+      cyw43_arch_lwip_end();
+      if (up && !_apUp) {
+        _apUp = true;
+        g_apIP = WiFi.localIP();
+        if (!g_serverStarted) { server.begin(); g_serverStarted = true; }
+        dlog("STA: connected, IP %s", g_apIP.toString().c_str());
+        if (!g_mdnsUp) {
+          const String host = String("furbyhub") + Cfg.v.unitId;
+          g_mdnsUp = MDNS.begin(host.c_str());
+          if (g_mdnsUp) { MDNS.addService("http", "tcp", 80); dlog("mDNS: http://%s.local", host.c_str()); }
+        }
+      } else if (!up && _apUp) {
+        _apUp = false;
+        _staNextTry = now + 3000;
+        dlog("STA: link lost, rejoining");
+      }
+      if (up) _staFails = 0;
+      if (!up && (int32_t)(now - _staNextTry) >= 0) {
+        staBegin();
+        static const uint32_t backoff[] = {10000, 20000, 30000, 60000};
+        _staNextTry = millis() + backoff[_staFails < 4 ? _staFails - 1 : 3];
+      }
+    }
+    if (_apUp) { if (g_mdnsUp) MDNS.update(); handleClient(); }
+    return;
+  }
 
   if (!_apUp) {                       // AP failed to come up: keep trying, the unit still works standalone
     if ((int32_t)(now - _nextApRetryMs) >= 0) {

@@ -1,4 +1,5 @@
 #include "Diag.h"
+#include "Settings.h"
 #include <EEPROM.h>
 #include <hardware/watchdog.h>
 #include <stdarg.h>
@@ -12,6 +13,7 @@ static constexpr uint32_t CRUMB_TAG  = 0xC0DE0000;
 struct DiagStore { uint16_t magic; uint8_t flags; uint8_t channel; };
 
 void diagLoad() {
+  eepromBegin();
   DiagStore s;
   EEPROM.get(DIAG_ADDR, s);
   if (s.magic == DIAG_MAGIC) { Dg.flags = s.flags; Dg.channel = s.channel; }
@@ -55,6 +57,7 @@ const char* crumbName(uint8_t s) {
     case CR_STATIONS: return "station poll";
     case CR_AP_START: return "AP start";   case CR_AP_RESTART: return "AP restart";
     case CR_FLASH_SAVE: return "flash save";
+    case CR_OSC: return "osc";
     case CR_CLEAN_REBOOT: return "commanded reboot";
   }
   return "?";
